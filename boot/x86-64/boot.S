@@ -1,91 +1,108 @@
-# 16-bit Boot Sector — AT&T/GAS syntax
+# -----------------------------------------------------------------------------
+# x86_64 Multiboot entry, pure assembly (AT&T/GAS)
+# يدخل الوضع الطويل 64-بت ثم يتوقف. لا طباعة، لا C.
+# -----------------------------------------------------------------------------
+
+# --------------------------- Multiboot header --------------------------------
+.set MB_MAGIC,    0x1BADB002
+.set MB_FLAGS,    0x00000003        # align modules + memory info
+.set MB_CHECKSUM, -(MB_MAGIC + MB_FLAGS)
+
+.section .multiboot, "a"
+.align 4
+mb_header:
+    .long MB_MAGIC
+    .long MB_FLAGS
+    .long MB_CHECKSUM
+
+# --------------------------- Writable data -----------------------------------
+.section .bss
+.align 4096
+pml4:           .skip 4096
+pdpt:           .skip 4096
+pd:             .skip 4096
+.align 16
+stack_bottom:   .skip 16384
+stack_top:
+
+# --------------------------- 32-bit entry ------------------------------------
 .section .text
-.code16
-.global _start
-
-_start:
-    # Setup stack and segments
-    xorw %ax, %ax
-    movw %ax, %ss
-    movw $0x7C00, %sp
-    movw %ax, %ds
-    movw %ax, %es
-
-    # Load kernel sectors (simplified)
-    movw $0x8000, %bx        # Load address for kernel
-    movb $0x02, %ah          # BIOS read sector
-    movb $5, %al             # Read 5 sectors
-    movb $0, %ch             # Cylinder 0
-    movb $2, %cl             # Sector 2
-    movb $0, %dh             # Head 0
-    int $0x13                # Call BIOS
-
-    # Jump to 32-bit protected mode code
-    lgdt gdt_descriptor      # Load GDT
-    movl %cr0, %eax
-    orl $1, %eax
-    movl %eax, %cr0
-    ljmp $0x08, $protect32
 .code32
-protect32:
-    # Setup 32-bit segments
+.global _start
+_start:
+    cli
+    movl $stack_top, %esp
+    movl %esp, %ebp
+
+    # --- PML4[0] -> PDPT ---
+    movl $pdpt, %eax
+    orl  $0x03, %eax                # present | writable
+    movl %eax, pml4
+
+    # --- PDPT[0] -> PD ---
+    movl $pd, %eax
+    orl  $0x03, %eax
+    movl %eax, pdpt
+
+    # --- PD: identity-map first 1 GiB with 2 MiB pages ---
+    movl $pd, %edi
+    movl $0x00000083, %eax          # present | writable | PS
+    movl $512, %ecx
+1:
+    movl %eax, (%edi)
+    addl $0x200000, %eax
+    addl $8, %edi
+    loop 1b
+
+    # Load PML4
+    movl $pml4, %eax
+    movl %eax, %cr3
+
+    # Enable PAE (CR4.PAE)
+    movl %cr4, %eax
+    orl  $(1 << 5), %eax
+    movl %eax, %cr4
+
+    # Set LME in EFER
+    movl $0xC0000080, %ecx
+    rdmsr
+    orl  $(1 << 8), %eax
+    wrmsr
+
+    # Enable paging (CR0.PG)
+    movl %cr0, %eax
+    orl  $(1 << 31), %eax
+    movl %eax, %cr0
+
+    # Load 64-bit GDT and far-jump into long mode
+    lgdt gdt64_desc
+    ljmp $0x08, $long_mode
+
+# --------------------------- 64-bit long mode --------------------------------
+.code64
+long_mode:
     movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
+    movw %ax, %ss
     movw %ax, %fs
     movw %ax, %gs
-    movw %ax, %ss
 
-    # Enable PAE and Long Mode
-    movl $0xC0000080, %ecx   # EFER MSR
-    rdmsr
-    orl $(1 << 8), %eax      # Set LME bit
-    wrmsr
+    movq $stack_top, %rsp
+    movq %rsp, %rbp
 
-    # Set up page tables and enable paging
-    # ... (paging setup code) ...
-    movl %cr0, %eax
-    orl $(1 << 31), %eax     # Enable paging
-    movl %eax, %cr0
-
-    # Jump to 64-bit code
-    ljmp $0x08, $protect64
-
-.code64
-protect64:
-    # 64-bit code here
-    # Set up stack, load kernel, etc.
-    cli
+    # لا شيء آخر: توقف نهائي
+1:  cli
     hlt
+    jmp 1b
 
-# GDT Definition
+# --------------------------- Read-only data ----------------------------------
+.section .rodata
 .align 8
-gdt_start:
-gdt_null:
-    .quad 0
-
-gdt_code:
-    .word 0xFFFF
-    .word 0
-    .byte 0
-    .byte 0x9A               # Present, Ring 0, Code
-    .byte 0xCF               # 4K pages, 32-bit D/B set
-    .byte 0
-
-gdt_data:
-    .word 0xFFFF
-    .word 0
-    .byte 0
-    .byte 0x92               # Present, Ring 0, Data
-    .byte 0x0F
-    .byte 0
-
-gdt_descriptor:
-    .word gdt_end - gdt_start - 1
-    .long gdt_start
-
-gdt_end:
-
-# Pad to 512 bytes and add boot signature
-.org 510, 0
-.word 0xAA55
+gdt64:
+    .quad 0x0000000000000000        # 0x00 null
+    .quad 0x00AF9A000000FFFF        # 0x08 64-bit code (L=1)
+    .quad 0x00AF92000000FFFF        # 0x10 64-bit data
+gdt64_desc:
+    .word gdt64_desc - gdt64 - 1
+    .quad gdt64
