@@ -1,7 +1,7 @@
 #ifndef _ERRNO_H
 #define _ERRNO_H
 #define EPERM 1
-#define EPERNT 2
+#define ENOENT 2
 #define ESRCH 3
 #define EINTR 4
 #define EIO 5
@@ -20,9 +20,8 @@
 #define EXDEV 18
 #define ENODEV 19
 #define EISDIR 21
-#define EISDIR 21
 #define EINVAL 22
-#define EIFILE 23
+#define ENFILE 23
 #define EMFILE 24
 #define ENOTTY	25
 #define ETXTBSY	26	
@@ -50,3 +49,4 @@
 #define EUNATCH	49
 #define ENOCSI	50
 #endif
+
