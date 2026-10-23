@@ -42,6 +42,7 @@ _start:
 
     # Far-jump to reload CS with our code selector
     ljmp $0x08, $reload_cs
+    call tty
 
 reload_cs:
     # Set up stack
