@@ -1,6 +1,17 @@
-CC = gcc
-CPP = c++
-FLACS = -I include/ -g -Wall -Wextra -c
+
+CC      = cc
+RS      = rustc
+ASFLAGS = -g -Wall -Wextra -c
+RSFLAGS = --emit=obj \
+          -W unused \
+          -W unreachable-pub \
+          -W missing-debug-implementations \
+          -C debuginfo=2
+
 all:
-	$(CC) $(FLACS) -m32 boot/x86/boot.S -o obj/x86/boot.o
-	$(CC) $(FLACS) -m32 driver/display/tty.c obj/x86/tty.o
+        mkdir -p obj/x86
+        $(CC) $(ASFLAGS) -m32 arch/x86/boot.S -o obj/x86/boot.o
+        $(RS) $(RSFLAGS) --target i686-unknown-linux-gnu drives/tty/main.rs -o obj/x86/tty.o
+
+clean:
+        rm -f obj/x86/*.o
