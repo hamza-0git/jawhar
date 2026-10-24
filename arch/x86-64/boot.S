@@ -90,6 +90,25 @@ long_mode:
 
     movq $stack_top, %rsp
     movq %rsp, %rbp
+    leaq stack_top(%rip), %rsp
+    movq %rsp, %rbp
+
+    # 3. صفّر .bss — إلزامي قبل أي كود Rust/C
+    leaq __bss_start(%rip), %rdi
+    leaq __bss_end(%rip),   %rcx
+    subq %rdi, %rcx
+    xorl %eax, %eax
+    rep stosb
+
+    # 4. (اختياري) إعادة تحميل GDT من Rust — يُفيد فقط لو أضفت TSS
+    # call gdt_init
+
+    # 5. مرّر معاملات Multiboot واستدعِ النواة
+    movl mb_magic(%rip), %edi     # arg0
+    movl mb_info(%rip),  %esi     # arg1
+    call gdt_init
+    sti
+    call tty
 
     # لا شيء آخر: توقف نهائي
 1:  cli

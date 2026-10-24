@@ -1,14 +1,15 @@
 #[no_std]
 /*
  * tty
-*/
+ */
+use printc
 fn tty()
 {
     let mut ch;
     loop {
         if (ch == '\n')
         {
-            return '\0';
+            puts('\0');
         }
     }
 }
