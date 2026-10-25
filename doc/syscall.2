@@ -1,0 +1,33 @@
+.TH "JAWHAR" "2" "Sun Oct 25" "SYSCALL"
+.SH NAME
+syscall, sys::call, __syscall  -- indirect system call
+.SH LIBRARY
+Standard C Library (libc, -lc)
+.SH SYNBOLE
+in c
+
+	
+ #include <sys/syscall.h>
+
+
+
+ #include <unistd.h>
+
+
+ int syscall(int number, ...);
+
+
+
+in rust
+
+
+ use sys::call;
+
+ use uni::std;
+
+
+ sys::call(number: u16, ...);
+.SH DESCRIPTION
+syscall() is func call the kernel in the code
+.SH AUTHORS
+hamza
