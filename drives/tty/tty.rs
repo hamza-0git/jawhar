@@ -1,0 +1,34 @@
+#[no_std]
+/*
+ * tty
+ */
+use core::fmt::{self, Write};
+struct Uart;
+impl Write for Uart {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for b in s.bytes() {
+            unsafe { core::ptr::write_volatile(0x1000_0000 as *mut u8, b); } // ← بدّلها بمنفذ UART عندك
+        }
+        Ok(())
+    }
+}
+macro_rules! print {
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        let _ = write!(Uart, $($arg)*);
+    }};
+}
+macro_rules! println {
+    ($($arg:tt)*) => {{ print!($($arg)*); print!("\n"); }};
+}
+use printc
+fn tty()
+{
+    let mut ch: String;
+    loop {
+        if ch == '\n'
+        {
+            println!("\0");
+        }
+    }
+}

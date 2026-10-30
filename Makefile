@@ -1,27 +1,62 @@
-CC      = cc
-RS      = rustc
-ASFLAGS = -g -Wall -Wextra -c
-RSFLAGS = --emit=obj \
-          -W unused \
-          -W unreachable-pub \
-          -W missing-debug-implementations \
-          -C debuginfo=2
+ARCH ?= x86
+ARCHES := x86 x86-64 aarch64
 
-all:
-	mkdir -p obj/x86
-	$(CC) $(ASFLAGS) -m32 arch/x86/boot.S -o obj/x86/boot.o
-	$(RS) $(RSFLAGS) --target i686-unknown-linux-gnu drives/tty/main.rs -o obj/x86/tty.o
+ifeq ($(filter $(ARCH),$(ARCHES)),)
+$(error unsupported ARCH '$(ARCH)' (choose from: $(ARCHES)))
+endif
+
+BUILD_DIR := obj/$(ARCH)
+KERNEL    := $(BUILD_DIR)/jawhar.elf
+SIZE      ?= size
+
+RUSTC ?= rustc
+RUST_SYSROOT := $(shell $(RUSTC) --print sysroot)
+rust_core = $(wildcard $(RUST_SYSROOT)/lib/rustlib/$(1)/lib/libcore*.rlib)
+rust_pick_target = $(firstword $(foreach t,$(1),$(if $(call rust_core,$(t)),$(t))))
+
+include arch/$(ARCH)/Makefile
+
+OBJS := $(addprefix $(BUILD_DIR)/, \
+          $(patsubst %.S,%.o,$(ASM_SRCS)) \
+          $(patsubst %.rs,%.o,$(RUST_SRCS)))
+
+RUST_LIBDIR := $(shell $(RUSTC) --print target-libdir --target $(RUST_TARGET))
+RUST_LIBS   := $(wildcard $(RUST_LIBDIR)/libcore-*.rlib) \
+               $(wildcard $(RUST_LIBDIR)/libcompiler_builtins-*.rlib)
+
+.PHONY: all clean distclean $(ARCHES) size help
+
+all: $(KERNEL)
+
+$(KERNEL): $(OBJS) $(RUST_LIBS) $(LDSCRIPT)
+	@mkdir -p $(@D)
+	$(LD) $(LDFLAGS) -T $(LDSCRIPT) -o $@ $(OBJS) \
+		--start-group $(RUST_LIBS) --end-group
+
+$(BUILD_DIR)/%.o: %.S $(MAKEFILE_LIST)
+	@mkdir -p $(@D)
+	$(CC) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/%.o: %.rs $(MAKEFILE_LIST)
+	@mkdir -p $(@D)
+	$(RUSTC) $(RUSTFLAGS) --emit=obj --crate-type lib $< -o $@
+
+$(ARCHES):
+	$(MAKE) ARCH=$@
+
+size: $(KERNEL)
+	$(SIZE) $<
 
 clean:
-<<<<<<< HEAD
-	rm -f obj/x86/*.o
-        $(CC) $(ASFLAGS) -m32 arch/x86/boot.S -o obj/x86/boot.o
-        $(RS) $(RSFLAGS) --target i686-unknown-linux-gnu drives/tty/main.rs -o obj/x86/tty.o
-        rm -f obj/x86/*.o
+	rm -rf $(BUILD_DIR)
 
-=======
-	    rm -f obj/*
+distclean:
+	rm -rf obj
 
-        
-        rm -f obj/x86/*.o
->>>>>>> 058e542220ffb80fe99f8fefb4b265dfb9c05aca
+help:
+	@echo "jawhar kernel"
+	@echo "  make ARCH=x86"
+	@echo "  make ARCH=x86-64"
+	@echo "  make ARCH=aarch64"
+	@echo "  make ARCH=<arch> clean"
+	@echo "  make distclean"

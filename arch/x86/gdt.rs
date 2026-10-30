@@ -19,7 +19,7 @@ impl Desc {
             base_lo:  (base  & 0xFFFF) as u16,
             base_mid: ((base  >> 16) & 0xFF) as u8,
             access,
-            flags_hi: (((flags & 0xF) << 4) | ((limit >> 16) & 0xF)) as u8,
+            flags_hi: ((flags & 0xF) << 4) | (((limit >> 16) & 0xF) as u8),
             base_hi:  ((base  >> 24) & 0xFF) as u8,
         }
     }

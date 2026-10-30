@@ -42,14 +42,14 @@ _start:
 
     # Far-jump to reload CS with our code selector
     ljmp $0x08, $reload_cs
-    call gdt_init
-    sti
-    call tty
 
 reload_cs:
     # Set up stack
     movl $stack_top, %esp
     movl %esp, %ebp
+
+    call gdt_init
+    sti
 
     # Done: halt forever
 1:  cli

@@ -15,7 +15,6 @@ _start:
     mov x0, x19
     mov x1, x20
     bl  gdt_init
-    bl tty
 
 1:  wfe
     b   1b

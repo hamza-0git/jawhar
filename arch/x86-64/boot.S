@@ -25,12 +25,19 @@ pd:             .skip 4096
 stack_bottom:   .skip 16384
 stack_top:
 
+.section .data
+.align 4
+mb_magic:       .long 0
+mb_info:        .long 0
+
 # --------------------------- 32-bit entry ------------------------------------
 .section .text
 .code32
 .global _start
 _start:
     cli
+    movl %eax, mb_magic
+    movl %ebx, mb_info
     movl $stack_top, %esp
     movl %esp, %ebp
 
@@ -108,7 +115,6 @@ long_mode:
     movl mb_info(%rip),  %esi     # arg1
     call gdt_init
     sti
-    call tty
 
     # لا شيء آخر: توقف نهائي
 1:  cli
